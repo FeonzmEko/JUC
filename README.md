@@ -352,7 +352,66 @@ class ThreadUnsafe{
 
 ## Monitor
 
-## wait/notify
+### Java对象头
+
+![image-20251109142606494](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251109142606494.png)
+
+### Monitor
+
+Monitor被翻译为**监视器**或**管程**
+
+每个Java对象都可以关联一个Monitor对象，如果使用synchronized给对象加上锁（重量级）之后，该对象的Mark Word中就被设置指向Monitor对象的指针
+
+Monitor对象结构
+
+![image-20251109143818115](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251109143818115.png)
+
+* 刚开始Monitor中Owner为null
+* 当Thread-2执行synchronized后，mointor中的owner变成Thread-2，owner只能有一个
+* 其他线程执行到synchronized，发现owner中已经有了线程，就会进入EntryList被阻塞
+* 从而保证了多线程并发情况下的原子性操作
+
+## synchronized原理进阶
+
+### 轻量级锁
+
+轻量级锁的使用场景：如果一个对象虽然有多线程访问，但多线程访问的时间是错开的（也就是没有竞争），那么可以用轻量级锁来优化。
+
+轻量级锁对使用者是透明的，即语法仍然是synchronized
+
+假设有两个方法同步块，利用同一个对象枷锁
+
+```java
+static final Object obj = new Object();
+public static void method1(){
+    synchronized(obj){
+        // 同步块A
+        method2();
+    }
+}
+
+public static void method2(){
+    synchronized(obj){
+        // 同步块B
+    }
+}
+```
+
+
+
+### 锁膨胀
+
+
+
+### 自旋优化
+
+重量级锁竞争的时候，还可以使用自旋来进行优化，如果当前线程自旋成功（即这时候持锁线程已经退出了同步块，释放了锁），这时当前线程就可以避免阻塞
+
+
+
+### 偏向锁
+
+## wait notify
 
 ## 线程状态转换
 
