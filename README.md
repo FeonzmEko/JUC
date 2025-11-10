@@ -411,10 +411,112 @@ public static void method2(){
 
 ### 偏向锁
 
+#### 偏向状态
+
+**对象头格式**
+
+![image-20251110094617434](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251110094617434.png)
+
+一个对象创建时：
+
+* 如果开启了偏向锁（默认开启），那么对象创建后，markword值为0x05即最后三位为101，这时它的thread，epoch，age都为0
+* 偏向锁是默认是延迟的，不会在程序启动时立即生效，如果想避免延迟，可以加VM参数来避免延迟
+* 如果没有开启偏向锁，那么对象创建后，markword值为0x01即最后三位为001，这时它的hashcode，age都为0，第一次用到hashcode时才会赋值
+
+#### 撤销-调用对象hashCode
+
+调用了对象的hashCode，但偏向锁的对象MarkWord中存储的是线程id，如果调用hashCode会导致偏向锁被撤销
+
+* 轻量级锁会在锁记录中记录hashCode
+* 重量级锁会在Monitor中记录hashCode
+
+#### 撤销-其它线程使用对象
+
+当有其它线程使用偏向锁对象时，会将偏向锁升级为轻量级锁
+
+#### 批量重偏向
+
+如果对象虽然被多个线程访问，但没有竞争，这时偏向了线程t1的对象仍然有机会重新偏向t2，冲偏向会重置对象的ThreadID
+
+当撤销偏向锁阈值超过20次后，jvm会这样觉得，我是不是偏向错了呢，于是会在给这些对象加锁时重新偏向至加锁线程
+
+#### 批量撤销
+
+当撤销偏向锁阈值超过40次后，jvm还会这样觉得，自己确实偏向错了，根本就不该偏向。于是整个类的所有对象都会变成不可偏向的，新建的对象也是不可偏向的。
+
+### 锁消除
+
+JIT对热点代码块去锁
+
 ## wait notify
 
-## 线程状态转换
+### 为什么需要wait
 
-## 活跃性
+![image-20251110105605958](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251110105605958.png)
 
-## Lock
+![image-20251110105639204](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251110105639204.png)
+
+**大致理解：**
+
+正在工作的线程需要额外的东西来休息，但无法获得，会调用wait方法从Owner进入WaitSet，此时被阻塞的线程会争抢进入Owner，并给在WaitSet里休息的线程递烟（notify），之后便离开休息室，重新进入竞争队列
+
+### 原理
+
+![image-20251110110307399](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251110110307399.png)
+
+* Owner线程发现条件不满足，调用wait方法，即可计入WaitSet变为WAITING状态
+* BLOCKED和WAITING的线程都处于阻塞状态，不占用CPU时间片
+* BLOCKED线程会在Owner线程释放锁时唤醒
+* WAITING线程会在Owner线程调用notify或notifyAll时唤醒，但唤醒后并不意味着立刻获得锁，仍需进入EntryList重新竞争
+
+
+
+### API介绍
+
+* obj.wait()让进入obj监视器的线程到waitSet等待
+* obj.notify()在obj上正在waitSet等待的线程挑一个唤醒
+* obj.notifyAll()让obj上正在waitSet等待的线程全部唤醒
+
+它们都是线程之间进行协作的手段，都属于Object对象的方法，必须获得此对象的锁，才能调用这几个方法
+
+### 正确用法
+
+**sleep和wait方法的区别**
+
+* sleep是Thread方法，而wait是Object的方法
+* sleep不需要强制和synchronized配合使用，但wait需要和synchronized一起用
+* sleep在休眠的同时，不会释放对象锁，但wait在等待的时候会释放对象锁
+
+```java
+synchronized(lock){
+    while(条件不成立){
+        lock.wait();
+    }
+    
+    // do something
+}
+
+// 另一个线程notifyAll()
+synchronized(lock){
+    lock.notifyAll();
+}
+```
+
+## 同步模式之保护性暂停
+
+### 定义
+
+定义：Guarded Suspension，用在一个线程等待另一个线程的执行结果
+
+* 有一个结果在线程间传递，让他们关联同一个GuardedObject
+* 如果需要不断传递，可以使用消息队列
+* JDK中，join，Future的实现，采用的就是此模式
+* 因为需要等待另一方的结果，归类到同步模式
+
+### 原理之join
+
+### 扩展点
+
+如果需要在多个类之间使用GuardedObject对象，作为参数传递不是很方便，因此设计一个用来解耦的中间类，不仅能解耦等待者和生产者，还能同时支持多个任务的管理
+
+![image-20251110170332434](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251110170332434.png)
