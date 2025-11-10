@@ -520,3 +520,66 @@ synchronized(lock){
 如果需要在多个类之间使用GuardedObject对象，作为参数传递不是很方便，因此设计一个用来解耦的中间类，不仅能解耦等待者和生产者，还能同时支持多个任务的管理
 
 ![image-20251110170332434](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251110170332434.png)
+
+## 异步模式之生产者/消费者
+
+* 与之前的保护性暂停中的GuardedObject不同，不需要产生结果和消费结果的线程一一对应
+* 消费队列可以用来平衡生产和消费的线程资源
+* 生产者仅负责产生结果数据，不管新数据该如何处理，而消费者专心处理结果数据
+* 消息队列是有容量限制的。满时不会再加入数据，空时不会再消耗数据
+* JDK中各种阻塞队列，采用的就是这种模式
+
+**代码实现**
+
+```java
+class MessageQueue{
+    // 双向链表来存储
+    private LinkedList<Message> list = new LinkedList<>();
+    // 队列容量
+    private int capacity;
+
+    public MessageQueue(int capacity){
+        this.capacity = capacity;
+    }
+
+    // 获取消息
+    public Message take(){
+        // 监察对象是否为空
+        synchronized (list){
+            while(list.isEmpty()){
+                try {
+                    log.debug("Consumer is waiting.");
+                    list.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            // 从队列头部获取消息返回
+            Message message = list.removeFirst();
+            log.debug("已消费消息 -> {}",message);
+            list.notifyAll();
+            return message;
+        }
+    }
+
+    // 存入消息
+    public void put(Message message){
+        // 队列尾部放入
+        synchronized (list){
+            while(list.size() == capacity){
+                try {
+                    log.debug("Queue is already full.");
+                    list.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            // 在尾部加入消息
+            list.addLast(message);
+            log.debug("已生产消息 -> {}",message);
+            list.notifyAll();
+        }
+    }
+}
+```
+
