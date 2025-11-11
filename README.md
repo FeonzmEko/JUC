@@ -583,3 +583,98 @@ class MessageQueue{
 }
 ```
 
+
+
+## Park & Unpark
+
+### 基本使用
+
+它们是LockSupport类中的方法
+
+```java
+// 暂停当前线程
+LockSupport.park();
+
+// 恢复某个线程的运行
+LockSupprot.unpark();
+```
+
+```java
+Thread t1 = new Thread(()->{
+    log.debug("start...");
+    try {
+        Thread.sleep(1000);
+    } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
+    log.debug("park...");
+    LockSupport.park();
+    log.debug("resume...");
+},"t1");
+t1.start();
+
+Thread.sleep(2000);
+log.debug("unpark...");
+LockSupport.unpark(t1);
+```
+
+### 特点
+
+与Object的wait&notify相比
+
+* wait，notify和notifyAll必须配合Object Monitor一起使用，而park和unpark不用
+* park&unpark是以线程为单位来【阻塞】和【唤醒】的，而notify只能随机唤醒一个等待线程，notifyAll是唤醒所有等待线程，不是很【精确】
+* park&unpark可以先unpark，而wait&notify则不可以先notify
+
+### 原理之park&unpark
+
+每个线程都隐含着一个 “许可（permit）” 标志，初始为 **0**。
+
+- **`unpark(thread)`**：给目标线程发放一个「许可」，即令 permit = 1。
+  如果此时线程未被阻塞，许可会“记下来”。
+- **`park()`**：如果线程调用 `park()`：
+  - 若 permit = 1，立即消耗掉这个许可（permit 变回 0），线程 **不会阻塞**。
+  - 若 permit = 0，线程会 **挂起**，直到被 `unpark()` 唤醒。
+
+👉 因此：
+
+- `park()` 与 `unpark()` 的调用**顺序无关**，即可以先 `unpark()` 再 `park()`。
+- 唤醒信号**不会丢失**（不像 `wait/notify` 那样丢失通知）。
+
+
+
+## 重新理解线程状态转换
+
+![image-20251111204901027](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251111204901027.png)
+
+假设有线程t
+
+### NEW-->RUNNABLE
+
+* 当调用`t.start()`方法
+
+### RUNNABLE<-->WAITING
+
+#### 情况一
+
+t线程使用synchronized(obj)获取了对象锁之后，
+
+* 调用`obj.wait()`方法时，`RUNNABLE-->WAITING`
+* 调用`obj.notifyAll(),obj.notify(),t.interrupt()`时，
+  * 竞争锁成功，`WAITING-->RUNNABLE`
+  * 竞争锁失败，`WAITING-->BLOCKED`
+
+#### 情况二
+
+* **当前线程now**调用`t.join()`方法时，now从RUNNABLE-->WAITING
+  * now线程会在t线程对象的监视器上等待
+* t线程运行结束，或调用了当前线程now的`interrupt()`时，当前线程从WAITING-->RUNNABLE
+
+#### 情况三
+
+* 当前线程调用`LockSupport.park()`
+* 调用`LockSupport.unpark(目标线程)`或调用了线程的`interrupt()`
+
+### RUNNABLE<-->TIMED_WAITING![image-20251111210418141](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251111210418141.png)
+
+![image-20251111210523019](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251111210523019.png)
