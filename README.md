@@ -678,3 +678,279 @@ t线程使用synchronized(obj)获取了对象锁之后，
 ### RUNNABLE<-->TIMED_WAITING![image-20251111210418141](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251111210418141.png)
 
 ![image-20251111210523019](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251111210523019.png)
+
+## 多把锁
+
+这两个功能互不相干，锁`this`细粒度太大，不能并发编程
+
+```java
+public void sleep() throws InterruptedException {
+    synchronized (this){
+        log.debug("sleeping 2 hours...");
+        Thread.sleep(2000);
+    }
+}
+
+public void study() throws InterruptedException {
+    synchronized (this){
+        log.debug("study 1 hour...");
+        Thread.sleep(1000);
+    }
+}
+```
+
+那就对业务互不相关的方法创建多把锁
+
+```java
+public void sleep() throws InterruptedException {
+    synchronized (sleepRoom){
+        log.debug("sleeping 2 hours...");
+        Thread.sleep(2000);
+    }
+}
+
+public void study() throws InterruptedException {
+    synchronized (studyRoom){
+        log.debug("study 1 hour...");
+        Thread.sleep(1000);
+    }
+}
+```
+
+这样就能够并发执行了
+
+**将锁的粒度细分**
+
+* 好处，是可以增强并发度
+* 坏处，如果一个线程同时获得多把锁，容易发生死锁
+
+## 活跃性
+
+### 死锁
+
+有这样的情况：一个县程序哟啊同事获取多把锁，这时就容易发生死锁
+
+t1线程获得A的锁，接下来想要获取B的锁
+
+t2线程获得B的锁，接下来想要获取A的锁
+
+```java
+Object A = new Object();
+Object B = new Object();
+Thread t1 = new Thread(()->{
+    synchronized (A){
+        log.debug("lock A");
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        synchronized (B){
+            log.debug("lock B");
+            log.debug("操作...");
+        }
+    }
+},"t1");
+
+Thread t2 = new Thread(()->{
+    synchronized (B){
+        log.debug("lock B");
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        synchronized (A){
+            log.debug("lock A");
+            log.debug("操作...");
+        }
+    }
+},"t2");
+
+t1.start();
+t2.start();
+```
+
+#### 定位死锁
+
+* `jps`拿到进程ID ，然后执行`jstack ID`
+* `jconsole`
+
+### 活锁
+
+活锁出现在两个线程互相改变对方的结束条件，最后谁也无法结束
+
+```java
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class TestLiveLock {
+    static volatile int count = 10;
+    static final Object Lock = new Object();
+    public static void main(String[] args) {
+        new Thread(()->{
+            // 期望减到0退出循环
+            while(count > 0){
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                count--;
+                log.debug("count:{}",count);
+            }
+        },"t1").start();
+
+        new Thread(()->{
+            // 期望减到0退出循环
+            while(count < 20){
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                count++;
+                log.debug("count:{}",count);
+            }
+        },"t2").start();
+    }
+}
+```
+
+### 饥饿
+
+一个顺序加锁对死锁的解决方案
+
+```mermaid
+sequenceDiagram
+participant t1 as 线程1
+participant t2 as 线程2
+participant a  as 对象A
+participant b as 对象B
+       t1 -->> a :尝试获取锁
+       Note over t1,a:拥有锁
+       t2 -->> b :尝试获取锁
+       Note over t2,b:拥有锁
+       t1 --x b : 尝试获取锁
+       t2 --x a : 尝试获取锁
+```
+
+顺序加锁的解决方案
+
+```mermaid
+sequenceDiagram
+participant t1 as 线程1
+participant t2 as 线程2
+participant a  as 对象A
+participant b as 对象B
+       t1 -->> a : 尝试获取锁
+       Note over t1,a: 拥有锁
+       t2 --x a : 尝试获取锁
+       t2 -->> a : 阻塞
+       t1 -->> b : 尝试获取锁
+       Note over t1,b: 拥有锁
+```
+
+## ReentrantLock
+
+相对于synchronized具备如下特点：
+
+* 可中断：可调用方法取消掉锁
+* 可以设置超时时间：synchronized设置的锁，线程无法获得锁会一直在waitSet等待；而可重入锁可以设置等待时间，超过等待时间自动执行其他任务
+* 可以设置为公平锁：防止饥饿
+* 支持多个条件变量：相当于有多个waitSet
+
+与synchronized一样，都支持可重入
+
+**基本语法**
+
+```java
+// 获取锁
+reentrantLock.lock();
+try{
+	// 临界区
+} finally {
+    // 释放锁
+    reentrantLock.unlock();
+}
+```
+
+### 可重入
+
+### 可打断
+
+```java
+Thread t1 = new Thread(()->{
+    try{
+        log.debug("尝试获取锁");
+        lock.lockInterruptibly();
+    } catch (InterruptedException e) {
+        e.printStackTrace();
+        log.debug("没有获得锁，返回");
+        return;
+    }
+
+    try{
+        log.debug("获取到锁");
+    } finally {
+        lock.unlock();
+    }
+},"t1");
+
+lock.lock();
+t1.start();
+
+Thread.sleep(1000);
+log.debug("打断t1");
+t1.interrupt();
+```
+
+### 锁超时
+
+超过最大等待时间自动取消阻塞
+
+```java
+Thread t1 = new Thread(()->{
+    log.debug("尝试获得锁");
+    try {
+        if(!lock.tryLock(2, TimeUnit.SECONDS)){
+            log.debug("获得锁失败");
+            return;
+        }
+    } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+    }
+
+    try {
+        log.debug("获得锁成功");
+    } finally {
+        lock.unlock();
+    }
+},"t1");
+
+lock.lock();
+log.debug("获得锁成功");
+t1.start();
+Thread.sleep(1000);
+log.debug("释放锁成功");
+lock.unlock();
+```
+
+### 公平锁
+
+```java
+ReentrantLock lock = new ReentrantLock(true);
+```
+
+### 条件变量
+
+synchronized中也有条件变量，就是waitSet，当条件不满足时进入waitSet等待
+
+而ReentrantLock有多个条件变量 
+
+**使用流程**
+
+* await前需要获得锁
+* await执行后，会释放锁，进入conditionObject等待
+* await的线程被唤醒（或打断，或超时）重新竞争lock锁
+* 竞争lock锁成功后，从await后继续执行
