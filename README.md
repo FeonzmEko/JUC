@@ -521,6 +521,10 @@ synchronized(lock){
 
 ![image-20251110170332434](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251110170332434.png)
 
+## 同步模式之顺序控制
+
+
+
 ## 异步模式之生产者/消费者
 
 * 与之前的保护性暂停中的GuardedObject不同，不需要产生结果和消费结果的线程一一对应
@@ -954,3 +958,28 @@ synchronized中也有条件变量，就是waitSet，当条件不满足时进入w
 * await执行后，会释放锁，进入conditionObject等待
 * await的线程被唤醒（或打断，或超时）重新竞争lock锁
 * 竞争lock锁成功后，从await后继续执行
+
+> 更细的控制线程的等待和唤醒，防止虚假唤醒的发生
+
+## 小结
+
+* 分析多线程访问共享资源时，哪些代码片段属于临界区
+* 使用synchronized互斥解决临界区的线程安全问题
+  * 掌握synchronized锁对象语法
+  * 掌握synchronized加载成员方法this和静态方法语法class
+  * 掌握wait notify同步方法
+* 使用lock互斥解决临界区的线程安全问题
+  * lock细节：可打断，锁超时，公平锁，条件变量
+* 分析变量的线程安全性，常见线程安全类
+* 线程活跃性问题：死锁，活锁，饥饿
+* 应用
+  * 互斥：使用synchronized或Lock达到共享资源的互斥效果
+  * 同步：使用wait/notify或Lock的条件变量来达到线程间的通信效果
+* 原理
+  * monitor，synchronized，wait/notify
+  * synchronized
+  * park & unpark
+* 模式
+  * 同步模式之保护性暂停
+  * 异步模式之生产者消费者
+  * 同步模式之顺序控制
