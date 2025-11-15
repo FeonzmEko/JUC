@@ -14,6 +14,7 @@ class WaitNotify_1 {
     public WaitNotify_1(int flag, int loopNumber){
         this.flag = flag;
         this.loopNumber = loopNumber;
+        System.out.println();
     }
 
     public void print(String s,int currentFlag,int nextFlag){

@@ -983,3 +983,94 @@ synchronized中也有条件变量，就是waitSet，当条件不满足时进入w
   * 同步模式之保护性暂停
   * 异步模式之生产者消费者
   * 同步模式之顺序控制
+
+# 共享模型之内存
+
+## Java内存模型
+
+JMM即Java Memory Model，它定义了主存，工作内存抽象概念，底层对应着CPU寄存器，缓存，硬件内存，CPU指令优化等
+
+JMM体现在下列三个方面：
+
+* 原子性
+* 可见性
+* 有序性
+
+## 可见性
+
+加`volatile`关键字
+
+## 同步模式之Balking(犹豫模式)
+
+```java
+if(starting){
+    return;
+}
+starting = true;
+```
+
+## double-checking-locking双检锁dcl
+
+## CAS特点
+
+结合CAS和volatile可以实现`无锁并发，适用于线程数少，多核CPU场景下`。
+
+* CAS是基于乐观锁的思想：最乐观的估计，不怕别的线程来修改共享变量，就算改了也无妨，可以一直重试
+* synchronized是基于悲观锁的思想：最悲观的估计，提防其它线程来修改共享变量
+* CAS体现的是`无锁并发，无阻塞并发`
+  * 因为没有synchronized，所以线程不会陷入阻塞，这是提高效率的因素之一
+  * 但如果竞争激烈，可以想到重试必然频繁发生，反而效率会受影响
+
+## 原子整数
+
+```java
+AtomicInteger i = new AtomicInteger(5);
+
+System.out.println(i.incrementAndGet());
+System.out.println(i.getAndIncrement());
+
+i.updateAndGet(value->value*10);
+System.out.println(i.get());
+```
+
+
+
+## ABA问题解决
+
+```java
+import lombok.extern.slf4j.Slf4j;
+import java.util.concurrent.atomic.AtomicStampedReference;
+
+@Slf4j
+public class Test4 {
+    static AtomicStampedReference<String> ref = new AtomicStampedReference<>("A",0);
+
+    public static void main(String[] args) throws InterruptedException {
+        log.debug("main start...");
+        // 取值
+        String prev = ref.getReference();
+        // 获取版本号
+        int stamp = ref.getStamp();
+        log.debug("{}",stamp);
+        other();
+        Thread.sleep(1000);
+        log.debug("change A->C {}",ref.compareAndSet(ref.getReference(),"C",stamp,stamp+1));
+    }
+
+    private static void other() {
+        new Thread(()->{
+            int stamp = ref.getStamp();
+            log.debug("change A->B {}",ref.compareAndSet(ref.getReference(),"B",stamp,stamp+1));
+        },"t1").start();
+
+        new Thread(()->{
+            int stamp = ref.getStamp();
+            log.debug("change B->A {}",ref.compareAndSet(ref.getReference(),"B",stamp,stamp+1));
+        },"t2").start();
+
+    }
+}
+```
+
+## 原子数组
+
