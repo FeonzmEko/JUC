@@ -1074,3 +1074,68 @@ public class Test4 {
 
 ## 原子数组
 
+## LongAdder
+
+`已经跳过，后边回来补`
+
+## Unsafe
+
+```java
+public class TestUnsafe {
+    @SneakyThrows
+    public static void main(String[] args) throws NoSuchFieldException {
+        Field theUnsafe = Unsafe.class.getDeclaredField("theUnsafe");
+        theUnsafe.setAccessible(true);
+        Unsafe unsafe = (Unsafe) theUnsafe.get(null);
+        System.out.println(unsafe);
+
+        // 获取域的偏移地址
+        long idOffset = unsafe.objectFieldOffset(Teacher.class.getDeclaredField("id"));
+        long nameOffset = unsafe.objectFieldOffset(Teacher.class.getDeclaredField("name"));
+
+        Teacher t = new Teacher();
+        // 执行cas操作
+        unsafe.compareAndSwapInt(t,idOffset,0,1);
+        unsafe.compareAndSwapObject(t,nameOffset,null,"张三");
+
+        System.out.println(t);
+    }
+}
+
+@Data
+class Teacher{
+    volatile int id;
+    volatile String name;
+}
+```
+
+## 享元模式
+
+### 简介
+
+Flyweight pattern当需要重用数量有限的同一对象时
+
+### 体现
+
+#### 包装类
+
+在JDK中Boolean，Byte等包装类提供了valueOf方法，例如Long的valueOf会缓存128-127之间的Long对象，在这个范围内会重用对象，大于这个范围才会新建Long对象
+
+## final
+
+final变量的赋值也会通过putfield来完成，完成后会加入写屏障，保证其它线程读到时不会出现为0的情况
+
+# 并发工具
+
+## 线程池
+
+### 自定义线程池
+
+大致流程：
+
+1. 创建线程池，传入线程数量，超时时间，消息队列容量，拒绝策略
+2. main线程执行任务
+3. 当任务数没有超过coreSize时，直接交给worker对象执行;如果任务超过coreSize，直接加入任务队列暂存
+4.  判断队列是否已满
+   * 已满：执行拒绝策略
+   * 未满：加入消息队列
