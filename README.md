@@ -1139,3 +1139,62 @@ final变量的赋值也会通过putfield来完成，完成后会加入写屏障�
 4.  判断队列是否已满
    * 已满：执行拒绝策略
    * 未满：加入消息队列
+
+### ThreadPoolExecutor
+
+#### 线程池状态
+
+![image-20251118184811415](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251118184811415.png)
+
+#### 构造方法
+
+![image-20251118190235964](C:\Users\Qingfeng\AppData\Roaming\Typora\typora-user-images\image-20251118190235964.png)
+
+救急线程类似于在拒绝策略执行条件满足时，不再执行拒绝策略，而是由救急线程进行任务的执行，执行完在通过`keepAliveTime`和`unit`进行救急线程的销毁
+
+**拒绝策略**
+
+#### newFixedThreadPool
+
+#### newCachedThreadPool
+
+外包公司，全员救急线程
+
+整个线程池表现为线程数会根据任务量不断增长，没有上限，当任务执行完毕，空闲1分钟后释放线程。
+
+适合任务数比较密集，但每个任务执行时间较短的情况
+
+ #### newSingleThreadPool
+
+单线程线程池
+
+* 线程池中只有一个线程来执行任务，任务失败则新建线程继续执行
+* 线程个数始终为1，不可修改
+  * 装饰器模式，不能调用线程池中特有方法
+
+#### 提交任务
+
+submit
+
+#### 关闭线程池
+
+shutdown
+
+shutdownNow
+
+#### 任务调度线程池
+
+#### 正确处理执行任务异常
+
+#### Tomcat线程池
+
+## 异步模式之工作线程
+
+把任务进行分类，分给不同的线程池，避免饥饿问题
+
+### 创建多少线程池合适
+
+#### CPU密集型运算
+
+#### I/O密集型运算
+
